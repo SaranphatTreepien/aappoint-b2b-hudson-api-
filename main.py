@@ -2,7 +2,9 @@ from fastapi import FastAPI, Query
 from dotenv import load_dotenv
 import requests
 import os
+from datetime import datetime, timedelta
 
+tz_bangkok = timedelta(hours=7)
 load_dotenv()
 
 app = FastAPI()
@@ -112,7 +114,13 @@ def daily_summary(shop_id: int, date: str = Query(...)):
         customer = next(
             (u for u in users if u["user"]["resource_type"] == "human"), None
         )
-
+        start_raw = e.get("start_at", "")
+        try:
+            start_utc = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+            start_local = start_utc + tz_bangkok
+            start_local_str = start_local.strftime("%Y-%m-%dT%H:%M:%S+07:00")
+        except Exception:
+            start_local_str = start_raw
         bookings.append(
             {
                 "event_id": e.get("id"),
