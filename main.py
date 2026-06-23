@@ -35,6 +35,22 @@ def get_events(shop_id: int, from_ts: int = Query(...), to_ts: int = Query(...))
     return res.json()
 
 
+@app.get("/shops")
+def search_shops(name: str = ""):
+    token = get_token()
+    res = requests.get(f"{BASE_URL}/shop", headers={"Authorization": f"Bearer {token}"})
+    shops = res.json()
+    if name:
+        name_lower = name.lower()
+        shops = [
+            s
+            for s in shops
+            if name_lower in s.get("name_en", "").lower()
+            or name_lower in s.get("name_th", "").lower()
+        ]
+    return shops
+
+
 @app.get("/shop/{shop_id}/events/{event_id}/customer")
 def get_customer(shop_id: int, event_id: int):
     token = get_token()
