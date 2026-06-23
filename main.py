@@ -39,14 +39,25 @@ def get_events(shop_id: int, from_ts: int = Query(...), to_ts: int = Query(...))
 def search_shops(name: str = ""):
     token = get_token()
     res = requests.get(f"{BASE_URL}/shop", headers={"Authorization": f"Bearer {token}"})
-    shops = res.json()
+    data = res.json()
+
+    if isinstance(data, dict):
+        shops = data.get("shops") or data.get("data") or []
+    elif isinstance(data, list):
+        shops = data
+    else:
+        shops = []
+
     if name:
         name_lower = name.lower()
         shops = [
             s
             for s in shops
-            if name_lower in s.get("name_en", "").lower()
-            or name_lower in s.get("name_th", "").lower()
+            if isinstance(s, dict)
+            and (
+                name_lower in s.get("name_en", "").lower()
+                or name_lower in s.get("name_th", "").lower()
+            )
         ]
     return shops
 
