@@ -183,7 +183,7 @@ def onboard_shop(shop_id: int, shop_name: str, email: str):
 
 SYSTEM_RESERVED_HUMAN_IDS = {"system_backend_aappoint", "system-backend-aappoint"}
 
-
+@app.post("/shops/bind")
 def bind_shop(
     human_id: str, email: str, shop_id: int, shop_name: str, channel: str = "email"
 ):
