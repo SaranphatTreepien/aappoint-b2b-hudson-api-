@@ -3,9 +3,14 @@ from dotenv import load_dotenv
 import requests
 import os
 from datetime import datetime, timedelta
+from supabase import create_client
 
-tz_bangkok = timedelta(hours=7)
 load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+tz_bangkok = timedelta(hours=7)
+
 
 app = FastAPI()
 
@@ -164,3 +169,52 @@ def get_customer(shop_id: int, event_id: int):
     users = res.json().get("users", [])
     customer = next((u for u in users if u["user"]["resource_type"] == "human"), None)
     return customer
+
+
+@app.post("/shops/onboard")
+def onboard_shop(shop_id: int, shop_name: str, email: str):
+    sb.table("shops").upsert(
+        {"shop_id": shop_id, "shop_name": shop_name, "email": email}
+    ).execute()
+    return {"ok": True}
+
+
+@app.post("/shops/bind")
+def bind_shop(human_id: str, email: str, channel: str = "email"):
+    shop = sb.table("shops").select("*").eq("email", email).execute()
+    if not shop.data:
+        return {"ok": False, "error": "shop not found"}
+    shop_id = shop.data[0]["shop_id"]
+
+    existing = sb.table("shop_human_ids").select("*").eq("human_id", human_id).execute()
+    if existing.data:
+        if existing.data[0]["shop_id"] != shop_id:
+            return {"ok": False, "error": "human_id bound to another shop"}
+        return {"ok": True, "shop_id": shop_id}  # idempotent
+
+    count = (
+        sb.table("shop_human_ids")
+        .select("id", count="exact")
+        .eq("shop_id", shop_id)
+        .execute()
+    )
+    if count.count >= 2:
+        return {"ok": False, "error": "max human_id reached for this shop"}
+
+    sb.table("shop_human_ids").insert(
+        {"shop_id": shop_id, "human_id": human_id, "channel": channel}
+    ).execute()
+    return {"ok": True, "shop_id": shop_id}
+
+
+@app.get("/shops/lookup")
+def lookup_shop(human_id: str):
+    r = (
+        sb.table("shop_human_ids")
+        .select("shop_id, shops(shop_name, email)")
+        .eq("human_id", human_id)
+        .execute()
+    )
+    if not r.data:
+        return {"ok": False}
+    return {"ok": True, **r.data[0]}
