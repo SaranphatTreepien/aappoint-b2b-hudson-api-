@@ -179,10 +179,16 @@ def onboard_shop(shop_id: int, shop_name: str, email: str):
     return {"ok": True}
 
 
+SYSTEM_RESERVED_HUMAN_IDS = {"system_backend_aappoint"}
+
+
 @app.post("/shops/bind")
 def bind_shop(
     human_id: str, email: str, shop_id: int, shop_name: str, channel: str = "email"
 ):
+    if human_id in SYSTEM_RESERVED_HUMAN_IDS:
+        return {"ok": False, "error": "reserved_human_id"}
+
     shop = sb.table("shops").select("*").eq("email", email).execute()
     if not shop.data:
         return {"ok": False, "error": "mismatch"}
