@@ -180,31 +180,39 @@ def onboard_shop(shop_id: int, shop_name: str, email: str):
 
 
 @app.post("/shops/bind")
-def bind_shop(human_id: str, email: str, channel: str = "email"):
+def bind_shop(
+    human_id: str, email: str, shop_id: int, shop_name: str, channel: str = "email"
+):
     shop = sb.table("shops").select("*").eq("email", email).execute()
     if not shop.data:
-        return {"ok": False, "error": "shop not found"}
-    shop_id = shop.data[0]["shop_id"]
+        return {"ok": False, "error": "mismatch"}
+
+    record = shop.data[0]
+    # cross-check เฉพาะ email + shop_id (ตัวจริง/เป็นความลับ) — shop_name ไม่เช็ค เพราะพิมพ์เพี้ยนง่าย
+    if record["shop_id"] != shop_id:
+        return {"ok": False, "error": "mismatch"}
+
+    real_shop_id = record["shop_id"]
 
     existing = sb.table("shop_human_ids").select("*").eq("human_id", human_id).execute()
     if existing.data:
-        if existing.data[0]["shop_id"] != shop_id:
-            return {"ok": False, "error": "human_id bound to another shop"}
-        return {"ok": True, "shop_id": shop_id}  # idempotent
+        if existing.data[0]["shop_id"] != real_shop_id:
+            return {"ok": False, "error": "mismatch"}
+        return {"ok": True, "shop_id": real_shop_id}
 
     count = (
         sb.table("shop_human_ids")
         .select("id", count="exact")
-        .eq("shop_id", shop_id)
+        .eq("shop_id", real_shop_id)
         .execute()
     )
     if count.count >= 2:
-        return {"ok": False, "error": "max human_id reached for this shop"}
+        return {"ok": False, "error": "mismatch"}
 
     sb.table("shop_human_ids").insert(
-        {"shop_id": shop_id, "human_id": human_id, "channel": channel}
+        {"shop_id": real_shop_id, "human_id": human_id, "channel": channel}
     ).execute()
-    return {"ok": True, "shop_id": shop_id}
+    return {"ok": True, "shop_id": real_shop_id}
 
 
 @app.get("/shops/lookup")
