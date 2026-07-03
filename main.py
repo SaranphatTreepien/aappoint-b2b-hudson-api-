@@ -173,20 +173,23 @@ def get_customer(shop_id: int, event_id: int):
 
 @app.post("/shops/onboard")
 def onboard_shop(shop_id: int, shop_name: str, email: str):
+    print(f"[ONBOARD] shop_id={shop_id} shop_name={shop_name} email={email}")
     sb.table("shops").upsert(
         {"shop_id": shop_id, "shop_name": shop_name, "email": email}
     ).execute()
+    print(f"[ONBOARD] ok shop_id={shop_id}")
     return {"ok": True}
 
 
-SYSTEM_RESERVED_HUMAN_IDS = {"system_backend_aappoint"}
+SYSTEM_RESERVED_HUMAN_IDS = {"system_backend_aappoint", "system-backend-aappoint"}
 
 
-@app.post("/shops/bind")
 def bind_shop(
     human_id: str, email: str, shop_id: int, shop_name: str, channel: str = "email"
 ):
+    print(f"[BIND] human_id={human_id} shop_id={shop_id} email={email}")
     if human_id in SYSTEM_RESERVED_HUMAN_IDS:
+        print(f"[BIND] REJECTED reserved_human_id human_id={human_id}")
         return {"ok": False, "error": "reserved_human_id"}
 
     shop = sb.table("shops").select("*").eq("email", email).execute()
@@ -218,11 +221,13 @@ def bind_shop(
     sb.table("shop_human_ids").insert(
         {"shop_id": real_shop_id, "human_id": human_id, "channel": channel}
     ).execute()
+    print(f"[BIND] ok human_id={human_id} shop_id={real_shop_id}")
     return {"ok": True, "shop_id": real_shop_id}
 
 
 @app.get("/shops/lookup")
 def lookup_shop(human_id: str):
+    print(f"[LOOKUP] human_id={human_id}")
     r = (
         sb.table("shop_human_ids")
         .select("shop_id, shops(shop_name, email)")
@@ -230,5 +235,7 @@ def lookup_shop(human_id: str):
         .execute()
     )
     if not r.data:
+        print(f"[LOOKUP] not_found human_id={human_id}")
         return {"ok": False}
+    print(f"[LOOKUP] found human_id={human_id} shop_id={r.data[0].get('shop_id')}")
     return {"ok": True, **r.data[0]}
